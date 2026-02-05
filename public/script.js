@@ -1,8 +1,8 @@
 // Configuration
 const REFRESH_INTERVAL = 5000; // 5 seconds
 const API_ENDPOINTS = {
-    stats: '/stats',
-    info: '/info',
+    stats: '/v4/stats',
+    info: '/v4/info',
     version: '/version'
 };
 
