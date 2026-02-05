@@ -3,16 +3,16 @@ server:
   address: 127.0.0.1
 
 lavalink:
-  # Plugins disabled for faster startup
+  # Plugins enabled
   plugins:
     # YouTube Source Plugin - Mandatory for v4
-    - dependency: "dev.lavalink.youtube:youtube-plugin:1.11.4"
+    - dependency: "dev.lavalink.youtube:youtube-plugin:1.17.0"
     # LavaSrc - Adds support for Spotify, Apple Music, Deezer, and more
-    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.1.1"
+    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.8.1"
       repository: "https://maven.lavalink.dev/releases"
   
   server:
-    password: ${LAVALINK_SERVER_PASSWORD:youshallnotpass}
+    password: ${LAVALINK_SERVER_PASSWORD:arbotixop007}
     sources:
       youtube: true
       bandcamp: true
@@ -48,7 +48,6 @@ lavalink:
     soundcloudSearchEnabled: true
     gc-warnings: true
 
-# Plugin configurations disabled (plugins are commented out above)
 # Plugin configurations
 plugins:
   # YouTube Source Plugin configuration
@@ -69,9 +68,10 @@ plugins:
       - "ytsearch:\"%ISRC%\""
       - "ytsearch:%QUERY%"
     sources:
-      spotify: true
-      applemusic: true
-      deezer: true
+      # Disable by default to prevent crashes if tokens are missing
+      spotify: ${SPOTIFY_ENABLED:false}
+      applemusic: ${APPLE_MUSIC_ENABLED:false}
+      deezer: ${DEEZER_ENABLED:false}
       yandexmusic: false
       flowerytts: false
     

@@ -12,9 +12,15 @@ services:
       - key: PORT
         value: 10000
       - key: LAVALINK_SERVER_PASSWORD
-        value: arbotixop007  # Fixed password to match bot's .env
+        value: arbotixop007
       - key: JAVA_TOOL_OPTIONS
         value: "-Xmx512m -Xms256m"
+      - key: SPOTIFY_ENABLED
+        value: "false"  # Change to "true" if you add tokens
+      - key: APPLE_MUSIC_ENABLED
+        value: "false"
+      - key: DEEZER_ENABLED
+        value: "false"
     
     # Health check configuration
     healthCheckPath: /version
