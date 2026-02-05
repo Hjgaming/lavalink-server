@@ -1,6 +1,6 @@
 server:
-  port: ${PORT:2333}
-  address: 0.0.0.0
+  port: 8080
+  address: 127.0.0.1
 
 lavalink:
   plugins:
@@ -91,7 +91,7 @@ plugins:
 
 metrics:
   prometheus:
-    enabled: ${METRICS_ENABLED:false}
+    enabled: ${METRICS_ENABLED:true}
     endpoint: /metrics
 
 sentry:

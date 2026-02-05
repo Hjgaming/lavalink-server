@@ -17,6 +17,7 @@
 ## ✨ Features
 
 - 🚀 **One-Click Deploy** - Deploy to Render with a single click
+- 📊 **Web Dashboard** - Beautiful real-time monitoring dashboard on the same port
 - 🎵 **Multi-Source Support** - YouTube, Spotify, Apple Music, Deezer, SoundCloud, Bandcamp, Twitch, Vimeo
 - 🔌 **Plugin System** - LavaSrc, LavaSearch, and SponsorBlock plugins pre-configured
 - 🎚️ **Audio Filters** - Equalizer, Karaoke, Timescale, Tremolo, Vibrato, Distortion, and more
@@ -45,6 +46,64 @@ The easiest way to get started:
    - Host: `your-service-name.onrender.com`
    - Port: `443` (HTTPS) or `80` (HTTP)
    - Password: The one you set in step 2
+   - Dashboard: `https://your-service-name.onrender.com/` (web interface)
+
+## 📊 Web Dashboard
+
+This Lavalink server includes a beautiful web dashboard that displays real-time metrics and server information. The dashboard runs on the **same port** as the Lavalink server, making it perfect for Render's single-port requirement.
+
+### Accessing the Dashboard
+
+Simply visit the root URL of your server:
+- **Local**: `http://localhost:2333/`
+- **Render**: `https://your-service-name.onrender.com/`
+
+### Dashboard Features
+
+The dashboard displays:
+
+- **Server Information**: Version, uptime, build details, git commit info
+- **Memory Metrics**: Used, allocated, free, and reservable memory with visual progress bars
+- **CPU Usage**: Process and system CPU usage with core count
+- **Player Statistics**: Active players, playing status, guild counts
+- **Frame Statistics**: Frames sent/lost per minute, loss percentage
+- **System Details**: JVM version, OS, thread counts
+- **Auto-refresh**: Updates every 5 seconds automatically
+- **Status Indicators**: Color-coded health status (green/yellow/red)
+- **Mobile Responsive**: Works perfectly on all devices
+
+### How It Works
+
+The server uses a **dual-process architecture**:
+1. **Nginx** (port 2333 or `$PORT`) - Serves the dashboard and proxies API requests
+2. **Lavalink** (port 8080 internal) - Handles audio streaming and bot connections
+
+Both processes run in the same Docker container managed by supervisord, ensuring both stay running together. This design is fully compatible with Render's single-port requirement.
+
+### Technical Architecture
+
+```
+┌─────────────────────────────────────────┐
+│  External Request (Port 2333)           │
+└─────────────────┬───────────────────────┘
+                  │
+                  ▼
+         ┌────────────────┐
+         │  Nginx Proxy   │
+         └────────┬───────┘
+                  │
+         ┌────────┴────────┐
+         │                 │
+    ┌────▼─────┐    ┌─────▼────────┐
+    │   HTML   │    │  Lavalink    │
+    │ Dashboard│    │ (Port 8080)  │
+    │   (/)    │    │   API/WS     │
+    └──────────┘    └──────────────┘
+```
+
+- Root path `/` → Static dashboard files
+- `/v4/*`, `/stats`, `/info`, `/version`, `/metrics` → Proxied to Lavalink
+- WebSocket `/v4/websocket` → Proxied with WebSocket support
 
 ## 📦 Manual Deployment
 
@@ -203,11 +262,13 @@ client.login('your_discord_bot_token');
 
 ## 🌐 Available Endpoints
 
+- `GET /` - **NEW!** Web dashboard (monitoring interface)
 - `GET /version` - Get Lavalink version info (health check)
 - `GET /info` - Get node information
 - `GET /stats` - Get node statistics
 - `GET /metrics` - Prometheus metrics (if enabled)
 - `WS /v4/websocket` - WebSocket endpoint for bot connections
+- `GET /v4/*` - All v4 API endpoints
 
 ## 🔒 Security
 
@@ -269,17 +330,40 @@ CMD ["java", "-Xmx2g", "-Xms512m", ...]
 
 ## 🐛 Troubleshooting
 
+### Dashboard Not Loading
+
+- Check that both Nginx and Lavalink are running: `docker logs <container-name>`
+- Verify the port is correctly set: `echo $PORT`
+- Check supervisor logs: `docker exec <container> cat /var/log/supervisor/supervisord.log`
+- Ensure port 2333 (or your custom port) is accessible
+
+### Dashboard Shows "Offline" Status
+
+- Lavalink may still be starting (wait 30-60 seconds after container start)
+- Check Lavalink logs: `docker exec <container> cat /var/log/supervisor/lavalink.out.log`
+- Verify Lavalink is running on internal port 8080
+- Check for errors in browser console (F12)
+
+### API Endpoints Return 502 Bad Gateway
+
+- Lavalink backend is not running or failed to start
+- Check Lavalink logs for errors
+- Verify application.yml configuration is correct
+- Ensure LAVALINK_SERVER_PASSWORD is set
+
 ### Container Won't Start
 
 - Check logs: `docker logs lavalink`
 - Verify environment variables are set correctly
 - Ensure port 2333 is not already in use
+- Check that all required files are present in the build
 
 ### Connection Issues
 
 - Verify password matches in bot and server
 - Check firewall rules
 - Ensure correct host/port in bot configuration
+- For WebSocket: Make sure `/v4/websocket` path is used
 
 ### Plugin Errors
 
