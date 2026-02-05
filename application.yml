@@ -3,8 +3,19 @@ server:
   address: 0.0.0.0
 
 lavalink:
+  plugins:
+    # LavaSrc - Adds support for Spotify, Apple Music, Deezer, and more
+    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.1.1"
+      repository: "https://maven.lavalink.dev/releases"
+    # LavaSearch - Enhanced search capabilities
+    - dependency: "com.github.topi314.lavasearch:lavasearch-plugin:1.0.0"
+      repository: "https://maven.lavalink.dev/releases"
+    # SponsorBlock - Skip sponsored segments in YouTube videos
+    - dependency: "com.github.topi314.sponsorblock:sponsorblock-plugin:3.0.1"
+      repository: "https://maven.lavalink.dev/releases"
+  
   server:
-    password: ${LAVALINK_SERVER_PASSWORD:ToingDc}
+    password: ${LAVALINK_SERVER_PASSWORD}
     sources:
       youtube: true
       bandcamp: true
@@ -13,22 +24,90 @@ lavalink:
       vimeo: true
       http: true
       local: false
+    
+    filters:
+      # Enable all audio filters
+      volume: true
+      equalizer: true
+      karaoke: true
+      timescale: true
+      tremolo: true
+      vibrato: true
+      distortion: true
+      rotation: true
+      channelMix: true
+      lowPass: true
+    
+    # Performance settings
     bufferDurationMs: 400
     frameBufferDurationMs: 5000
-    youtubePlaylistLoadLimit: 6
+    opusEncodingQuality: ${OPUS_ENCODING_QUALITY:10}
+    resamplingQuality: LOW
+    trackStuckThresholdMs: ${TRACK_STUCK_THRESHOLD:10000}
+    useSeekGhosting: true
+    youtubePlaylistLoadLimit: ${YOUTUBE_PLAYLIST_LOAD_LIMIT:10}
     playerUpdateInterval: 5
     youtubeSearchEnabled: true
     soundcloudSearchEnabled: true
     gc-warnings: true
 
+plugins:
+  # LavaSrc configuration
+  lavasrc:
+    providers:
+      - "ytsearch:\"%ISRC%\""
+      - "ytsearch:%QUERY%"
+    sources:
+      spotify: true
+      applemusic: true
+      deezer: true
+      yandexmusic: false
+      flowerytts: false
+    
+    spotify:
+      clientId: ${SPOTIFY_CLIENT_ID:""}
+      clientSecret: ${SPOTIFY_CLIENT_SECRET:""}
+      countryCode: ${SPOTIFY_COUNTRY_CODE:US}
+      playlistLoadLimit: 10
+      albumLoadLimit: 10
+    
+    applemusic:
+      countryCode: ${APPLE_MUSIC_COUNTRY_CODE:US}
+      mediaAPIToken: ${APPLE_MUSIC_API_TOKEN:""}
+      playlistLoadLimit: 10
+      albumLoadLimit: 10
+    
+    deezer:
+      masterDecryptionKey: ${DEEZER_MASTER_KEY:""}
+  
+  # LavaSearch configuration
+  lavasearch:
+    sources:
+      youtube: true
+      soundcloud: true
+      spotify: true
+      applemusic: true
+      deezer: true
+
 metrics:
   prometheus:
-    enabled: false
+    enabled: ${METRICS_ENABLED:false}
+    endpoint: /metrics
 
 sentry:
-  dsn: ""
+  dsn: ${SENTRY_DSN:""}
+  environment: ${ENVIRONMENT:production}
 
 logging:
+  file:
+    path: ./logs/
+  
   level:
     root: INFO
     lavalink: INFO
+  
+  logback:
+    rollingpolicy:
+      max-history: 7
+      max-file-size: 10MB
+      total-size-cap: 100MB

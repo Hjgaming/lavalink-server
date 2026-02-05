@@ -1,0 +1,31 @@
+# Git files
+.git
+.github
+.gitignore
+
+# Documentation
+*.md
+README.md
+LICENSE
+
+# Logs
+logs/
+*.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
