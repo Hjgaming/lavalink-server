@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: lavalink-server
+    runtime: docker
+    plan: free  # Change to 'starter' or higher for better performance
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    region: oregon  # Change to your preferred region
+    
+    # Environment variables
+    envVars:
+      - key: PORT
+        value: 2333
+      - key: LAVALINK_SERVER_PASSWORD
+        generateValue: true  # Auto-generate a secure password
+      - key: JAVA_TOOL_OPTIONS
+        value: "-Xmx512m -Xms128m"
+    
+    # Health check configuration
+    healthCheckPath: /version
+    
+    # Auto-deploy on push to main branch
+    autoDeploy: true
+    
+    # Disk configuration for logs (optional, requires paid plan)
+    # disk:
+    #   name: lavalink-data
+    #   mountPath: /opt/Lavalink/logs
+    #   sizeGB: 1

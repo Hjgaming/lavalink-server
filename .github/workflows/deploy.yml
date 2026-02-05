@@ -1,0 +1,132 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  docker-build:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: lavalink-server:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Create test environment file
+        run: |
+          echo "LAVALINK_SERVER_PASSWORD=test_password_123" > .env
+          echo "PORT=2333" >> .env
+      
+      - name: Start container
+        run: |
+          docker run -d --name lavalink-test \
+            -p 2333:2333 \
+            -e LAVALINK_SERVER_PASSWORD=test_password_123 \
+            -e PORT=2333 \
+            lavalink-server:test
+      
+      - name: Wait for container to be ready
+        run: |
+          echo "Waiting for Lavalink to start..."
+          sleep 30
+          
+          # Check if container is still running
+          if ! docker ps | grep -q lavalink-test; then
+            echo "Container stopped unexpectedly"
+            docker logs lavalink-test
+            exit 1
+          fi
+      
+      - name: Health check test
+        run: |
+          echo "Testing health check endpoint..."
+          
+          # Try multiple times with exponential backoff
+          max_attempts=5
+          attempt=1
+          
+          while [ $attempt -le $max_attempts ]; do
+            if curl -f http://localhost:2333/version; then
+              echo "Health check passed!"
+              exit 0
+            fi
+            
+            echo "Attempt $attempt/$max_attempts failed, retrying..."
+            sleep $((attempt * 10))
+            attempt=$((attempt + 1))
+          done
+          
+          echo "Health check failed after $max_attempts attempts"
+          docker logs lavalink-test
+          exit 1
+      
+      - name: Show container logs
+        if: always()
+        run: docker logs lavalink-test
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop lavalink-test || true
+          docker rm lavalink-test || true
+
+  validate-config:
+    name: Validate Configuration Files
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Validate YAML files
+        run: |
+          # Check if yamllint is available, install if not
+          if ! command -v yamllint &> /dev/null; then
+            pip install yamllint
+          fi
+          
+          # Validate application.yml
+          yamllint -d relaxed application.yml || true
+          
+          # Validate render.yaml
+          yamllint -d relaxed render.yaml || true
+      
+      - name: Check for secrets in code
+        run: |
+          # Ensure no hardcoded passwords or secrets
+          if grep -r "ToingDc" .; then
+            echo "Error: Found hardcoded password 'ToingDc' in files"
+            exit 1
+          fi
+          
+          echo "No hardcoded secrets found - OK"
+      
+      - name: Verify environment variable usage
+        run: |
+          # Check that application.yml uses environment variables
+          if grep -q "LAVALINK_SERVER_PASSWORD" application.yml; then
+            echo "Password uses environment variable - OK"
+          else
+            echo "Error: Password should use environment variable"
+            exit 1
+          fi
