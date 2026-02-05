@@ -147,28 +147,29 @@ async function fetchJSON(endpoint) {
         
         // Get raw text first for debugging
         const text = await response.text();
+        const trimmedText = text.trim();
         
         // Check for empty response
-        if (!text.trim()) {
+        if (!trimmedText) {
             throw new Error('Empty response from ' + endpoint);
         }
         
         // Check for HTML response
-        if (text.trim().startsWith('<')) {
-            throw new Error('Received HTML instead of JSON from ' + endpoint);
+        if (trimmedText.startsWith('<')) {
+            throw new Error('Received HTML instead of JSON from ' + endpoint + ': ' + trimmedText.substring(0, MAX_ERROR_PREVIEW_LENGTH));
         }
         
-        // Check for plain text response
-        if (!text.trim().startsWith('{') && !text.trim().startsWith('[')) {
-            throw new Error('Received non-JSON response from ' + endpoint + ': ' + text.substring(0, MAX_ERROR_PREVIEW_LENGTH));
+        // Check for plain text response (JSON must start with { or [)
+        if (!trimmedText.startsWith('{') && !trimmedText.startsWith('[')) {
+            throw new Error('Received non-JSON response from ' + endpoint + ': ' + trimmedText.substring(0, MAX_ERROR_PREVIEW_LENGTH));
         }
         
         if (!response.ok) {
-            throw new Error('HTTP ' + response.status + ': ' + response.statusText + ' - ' + text.substring(0, MAX_ERROR_DETAIL_LENGTH));
+            throw new Error('HTTP ' + response.status + ': ' + response.statusText + ' - ' + trimmedText.substring(0, MAX_ERROR_DETAIL_LENGTH));
         }
         
         // Parse JSON
-        const data = JSON.parse(text);
+        const data = JSON.parse(trimmedText);
         return data;
     } catch (error) {
         if (error instanceof SyntaxError) {
