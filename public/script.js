@@ -4,6 +4,8 @@ const INITIAL_RETRY_DELAY = 2000; // 2 seconds
 const MAX_RETRIES = 5; // Maximum retry attempts on initial connection
 const WARNING_GRADIENT = 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)';
 const ERROR_GRADIENT = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+const MAX_ERROR_PREVIEW_LENGTH = 100; // Maximum length of error message preview
+const MAX_ERROR_DETAIL_LENGTH = 200; // Maximum length of detailed error message
 const API_ENDPOINTS = {
     stats: '/v4/stats',
     info: '/v4/info',
@@ -143,23 +145,36 @@ async function fetchJSON(endpoint) {
     try {
         const response = await fetch(endpoint);
         
-        // Check if we got HTML instead of JSON (nginx serving index.html)
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('text/html')) {
-            throw new Error('Received HTML instead of JSON. Nginx may be serving static files instead of proxying to Lavalink. Check endpoint configuration.');
+        // Get raw text first for debugging
+        const text = await response.text();
+        const trimmedText = text.trim();
+        
+        // Check for empty response
+        if (!trimmedText) {
+            throw new Error('Empty response from ' + endpoint);
+        }
+        
+        // Check for HTML response
+        if (trimmedText.startsWith('<')) {
+            throw new Error('Received HTML instead of JSON from ' + endpoint + ': ' + trimmedText.substring(0, MAX_ERROR_PREVIEW_LENGTH));
+        }
+        
+        // Check for plain text response (JSON must start with { or [)
+        if (!trimmedText.startsWith('{') && !trimmedText.startsWith('[')) {
+            throw new Error('Received non-JSON response from ' + endpoint + ': ' + trimmedText.substring(0, MAX_ERROR_PREVIEW_LENGTH));
         }
         
         if (!response.ok) {
-            throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+            throw new Error('HTTP ' + response.status + ': ' + response.statusText + ' - ' + trimmedText.substring(0, MAX_ERROR_DETAIL_LENGTH));
         }
         
-        const data = await response.json();
+        // Parse JSON
+        const data = JSON.parse(trimmedText);
         return data;
     } catch (error) {
-        // Provide more context for common errors
         if (error instanceof SyntaxError) {
             console.error('JSON parse error for ' + endpoint + ':', error);
-            throw new Error('Invalid JSON response from ' + endpoint + '. Response had valid Content-Type but failed to parse.');
+            throw new Error('Invalid JSON response from ' + endpoint + '. Check server logs.');
         }
         console.error('Error fetching ' + endpoint + ':', error);
         throw error;
@@ -301,13 +316,25 @@ async function updateSystemDetails() {
 
 async function updateDashboard() {
     try {
-        // Fetch all data
+        // Fetch critical data
         await Promise.all([
             updateStats(),
             updateInfo(),
-            updateVersion(),
-            updateSystemDetails()
         ]);
+        
+        // Try to update version, but don't fail if it doesn't work
+        try {
+            await updateVersion();
+        } catch (error) {
+            console.warn('Version endpoint failed, continuing anyway:', error);
+        }
+        
+        // Try to update system details, but don't fail if it doesn't work
+        try {
+            await updateSystemDetails();
+        } catch (error) {
+            console.warn('System details failed, continuing anyway:', error);
+        }
         
         // Update status
         isOnline = true;
