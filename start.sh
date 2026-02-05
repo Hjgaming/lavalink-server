@@ -89,6 +89,18 @@ nginx -g 'daemon off;' &
 NGINX_PID=$!
 echo "Nginx PID: $NGINX_PID"
 
+# Wait a moment for nginx to fully start
+sleep 2
+
+# Test that nginx is proxying correctly
+echo ""
+echo "Testing nginx proxy to Lavalink..."
+if curl -s "http://127.0.0.1:$PORT/version" > /dev/null 2>&1; then
+    echo "  ✓ Nginx proxy is working correctly"
+else
+    echo "  WARNING: Nginx proxy test failed"
+fi
+
 echo ""
 echo "========================================"
 echo "  Lavalink Public Server - Running"
@@ -102,9 +114,21 @@ echo "  Password:  Set in LAVALINK_SERVER_PASSWORD env var"
 echo ""
 echo "========================================"
 
-# Wait for either process to exit
-wait -n $LAVALINK_PID $NGINX_PID
-
-# If we get here, one process died, so shutdown everything
-echo "One of the processes exited unexpectedly"
-shutdown
+# Monitor both processes - Alpine's ash doesn't support wait -n
+# Use a polling loop to check if processes are still running
+while true; do
+    # Check if Lavalink is still running
+    if ! kill -0 "$LAVALINK_PID" 2>/dev/null; then
+        echo "Lavalink process exited unexpectedly"
+        shutdown
+    fi
+    
+    # Check if Nginx is still running
+    if ! kill -0 "$NGINX_PID" 2>/dev/null; then
+        echo "Nginx process exited unexpectedly"
+        shutdown
+    fi
+    
+    # Sleep briefly before next check
+    sleep 5
+done
