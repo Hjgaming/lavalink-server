@@ -1,5 +1,7 @@
 // Configuration
 const REFRESH_INTERVAL = 5000; // 5 seconds
+const INITIAL_RETRY_DELAY = 2000; // 2 seconds
+const MAX_RETRIES = 5; // Maximum retry attempts on initial connection
 const API_ENDPOINTS = {
     stats: '/v4/stats',
     info: '/v4/info',
@@ -9,6 +11,8 @@ const API_ENDPOINTS = {
 // State
 let isOnline = false;
 let lastUpdate = null;
+let retryCount = 0;
+let isInitializing = true;
 
 // Utility Functions
 function formatBytes(bytes) {
@@ -75,13 +79,20 @@ function updateElement(id, value) {
     }
 }
 
-function showError(message) {
+function showError(message, isWarning = false) {
     const errorElement = document.getElementById('error-message');
     const errorText = document.getElementById('error-text');
     
     if (errorElement && errorText) {
         errorText.textContent = message;
         errorElement.style.display = 'flex';
+        
+        // Visual distinction for warnings vs errors
+        if (isWarning) {
+            errorElement.style.background = 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)';
+        } else {
+            errorElement.style.background = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+        }
     }
 }
 
@@ -92,12 +103,16 @@ function hideError() {
     }
 }
 
-function updateStatusBadge(online) {
+function updateStatusBadge(online, connecting = false) {
     const badge = document.getElementById('status-badge');
     const statusText = document.getElementById('status-text');
     
     if (badge && statusText) {
-        if (online) {
+        if (connecting) {
+            badge.classList.remove('online');
+            badge.classList.add('offline');
+            statusText.textContent = 'Connecting...';
+        } else if (online) {
             badge.classList.add('online');
             badge.classList.remove('offline');
             statusText.textContent = 'Online';
@@ -129,11 +144,25 @@ function updateLastUpdateTime() {
 async function fetchJSON(endpoint) {
     try {
         const response = await fetch(endpoint);
+        
+        // Check if we got HTML instead of JSON (nginx serving index.html)
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('text/html')) {
+            throw new Error(`Received HTML instead of JSON. Nginx may be misconfigured or Lavalink is not running.`);
+        }
+        
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        return await response.json();
+        
+        const data = await response.json();
+        return data;
     } catch (error) {
+        // Provide more context for common errors
+        if (error instanceof SyntaxError) {
+            console.error(`JSON parse error for ${endpoint}:`, error);
+            throw new Error(`Invalid JSON response from ${endpoint}. Server may be returning HTML.`);
+        }
         console.error(`Error fetching ${endpoint}:`, error);
         throw error;
     }
@@ -284,6 +313,8 @@ async function updateDashboard() {
         
         // Update status
         isOnline = true;
+        isInitializing = false;
+        retryCount = 0;
         updateStatusBadge(true);
         hideError();
         
@@ -294,17 +325,33 @@ async function updateDashboard() {
     } catch (error) {
         console.error('Dashboard update failed:', error);
         isOnline = false;
-        updateStatusBadge(false);
-        showError(`Failed to fetch data: ${error.message}`);
+        
+        // Different handling for initial connection vs ongoing updates
+        if (isInitializing && retryCount < MAX_RETRIES) {
+            retryCount++;
+            updateStatusBadge(false, true);
+            showError(`Connecting to Lavalink... (Attempt ${retryCount}/${MAX_RETRIES}). Server may still be starting up.`, true);
+        } else if (isInitializing && retryCount >= MAX_RETRIES) {
+            isInitializing = false;
+            updateStatusBadge(false);
+            showError(`Unable to connect to Lavalink after ${MAX_RETRIES} attempts. Error: ${error.message}`);
+        } else {
+            updateStatusBadge(false);
+            showError(`Connection lost: ${error.message}`);
+        }
     }
 }
 
 // Initialize
-function init() {
+async function init() {
     console.log('Initializing Lavalink Dashboard...');
     
-    // Initial update
-    updateDashboard();
+    // Set status to connecting
+    updateStatusBadge(false, true);
+    showError('Connecting to Lavalink...', true);
+    
+    // Initial update with retry logic
+    await retryInitialConnection();
     
     // Set up auto-refresh
     setInterval(updateDashboard, REFRESH_INTERVAL);
@@ -313,6 +360,26 @@ function init() {
     setInterval(updateLastUpdateTime, 1000);
     
     console.log(`Dashboard initialized. Auto-refresh every ${REFRESH_INTERVAL / 1000}s`);
+}
+
+// Retry logic for initial connection
+async function retryInitialConnection() {
+    for (let i = 0; i < MAX_RETRIES; i++) {
+        try {
+            await updateDashboard();
+            // Success - exit retry loop
+            return;
+        } catch (error) {
+            if (i < MAX_RETRIES - 1) {
+                // Wait before retrying
+                console.log(`Retry ${i + 1}/${MAX_RETRIES} failed, waiting ${INITIAL_RETRY_DELAY}ms before next attempt...`);
+                await new Promise(resolve => setTimeout(resolve, INITIAL_RETRY_DELAY));
+            }
+        }
+    }
+    
+    // All retries exhausted
+    console.error('Failed to establish initial connection after all retries');
 }
 
 // Start when DOM is ready
