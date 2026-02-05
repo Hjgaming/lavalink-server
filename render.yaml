@@ -10,11 +10,11 @@ services:
     # Environment variables
     envVars:
       - key: PORT
-        value: 2333
+        value: 10000
       - key: LAVALINK_SERVER_PASSWORD
         generateValue: true  # Auto-generate a secure password
       - key: JAVA_TOOL_OPTIONS
-        value: "-Xmx512m -Xms128m"
+        value: "-Xmx400m -Xms100m"
     
     # Health check configuration
     healthCheckPath: /version

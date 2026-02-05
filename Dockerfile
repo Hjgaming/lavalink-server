@@ -7,6 +7,9 @@ LABEL maintainer="Lavalink Server"
 LABEL description="Lavalink audio streaming node with web dashboard"
 LABEL version="4.0"
 
+# Install curl for health checks
+RUN apk add --no-cache curl
+
 # Create lavalink user and group
 RUN addgroup -g 322 lavalink && adduser -u 322 -G lavalink -s /bin/sh -D lavalink
 
@@ -44,12 +47,12 @@ RUN mkdir -p /var/log/nginx /opt/Lavalink/logs /run/nginx && \
     chown -R lavalink:lavalink /opt/Lavalink && \
     chmod 755 /var/log/nginx /run/nginx
 
-# Expose single port (default 2333, configurable via PORT env var)
-EXPOSE 2333
+# Expose single port (default 10000, Render's standard)
+EXPOSE 10000
 
 # Health check configuration  
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:${PORT:-2333}/version || exit 1
+  CMD curl -f http://localhost:${PORT:-10000}/version || exit 1
 
 # Use our startup script
 CMD ["/opt/start.sh"]
