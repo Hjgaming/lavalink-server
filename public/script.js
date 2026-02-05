@@ -2,6 +2,8 @@
 const REFRESH_INTERVAL = 5000; // 5 seconds
 const INITIAL_RETRY_DELAY = 2000; // 2 seconds
 const MAX_RETRIES = 5; // Maximum retry attempts on initial connection
+const WARNING_GRADIENT = 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)';
+const ERROR_GRADIENT = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
 const API_ENDPOINTS = {
     stats: '/v4/stats',
     info: '/v4/info',
@@ -88,11 +90,7 @@ function showError(message, isWarning = false) {
         errorElement.style.display = 'flex';
         
         // Visual distinction for warnings vs errors
-        if (isWarning) {
-            errorElement.style.background = 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)';
-        } else {
-            errorElement.style.background = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
-        }
+        errorElement.style.background = isWarning ? WARNING_GRADIENT : ERROR_GRADIENT;
     }
 }
 
@@ -148,11 +146,11 @@ async function fetchJSON(endpoint) {
         // Check if we got HTML instead of JSON (nginx serving index.html)
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('text/html')) {
-            throw new Error('Received HTML instead of JSON. Nginx may be misconfigured or Lavalink is not running.');
+            throw new Error('Received HTML instead of JSON. Nginx may be serving static files instead of proxying to Lavalink. Check endpoint configuration.');
         }
         
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            throw new Error('HTTP ' + response.status + ': ' + response.statusText);
         }
         
         const data = await response.json();
@@ -160,10 +158,10 @@ async function fetchJSON(endpoint) {
     } catch (error) {
         // Provide more context for common errors
         if (error instanceof SyntaxError) {
-            console.error(`JSON parse error for ${endpoint}:`, error);
-            throw new Error('Invalid JSON response from ' + endpoint + '. Server may be returning HTML.');
+            console.error('JSON parse error for ' + endpoint + ':', error);
+            throw new Error('Invalid JSON response from ' + endpoint + '. Response had valid Content-Type but failed to parse.');
         }
-        console.error(`Error fetching ${endpoint}:`, error);
+        console.error('Error fetching ' + endpoint + ':', error);
         throw error;
     }
 }
