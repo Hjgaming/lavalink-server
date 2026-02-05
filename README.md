@@ -365,6 +365,46 @@ CMD ["java", "-Xmx2g", "-Xms512m", ...]
 - Ensure correct host/port in bot configuration
 - For WebSocket: Make sure `/v4/websocket` path is used
 
+### Render Cold Start Timeout (IMPORTANT for Free Tier)
+
+Render's free tier "spins down" your service after 15 minutes of inactivity. When a bot tries to connect, the server needs time to start up. **This can take 30-60 seconds**.
+
+**Solution:** Increase your bot's Lavalink connection timeout:
+
+```javascript
+// For Shoukaku
+const shoukaku = new Shoukaku(
+  new Connectors.DiscordJS(client),
+  [{
+    name: 'Lavalink',
+    url: 'your-service-name.onrender.com:443',
+    auth: 'your_password',
+    secure: true
+  }],
+  {
+    reconnectTries: 3,
+    reconnectInterval: 5000,
+    restTimeout: 60000,        // 60 seconds for REST calls
+    moveOnDisconnect: false
+  }
+);
+
+// For Erela.js
+client.manager = new Manager({
+  nodes: [{
+    host: 'your-service-name.onrender.com',
+    port: 443,
+    password: 'your_password',
+    secure: true,
+    retryDelay: 5000,
+    requestTimeout: 60000  // 60 seconds timeout
+  }],
+  // ... rest of your config
+});
+```
+
+**Tip:** To keep your server warm, you can set up a cron job or monitoring service to ping your `/health` endpoint every 10 minutes.
+
 ### Plugin Errors
 
 - Plugins require API credentials to work

@@ -1,25 +1,24 @@
 #!/bin/sh
 set -e
 
-echo "Starting Lavalink Dashboard Server..."
+echo "========================================"
+echo "  Lavalink Public Server - Starting"
+echo "========================================"
 
 # Get the port from environment variable, default to 10000 (Render's standard)
 PORT=${PORT:-10000}
-echo "Using port: $PORT"
+echo "Port: $PORT"
 
 # Get the Lavalink password from environment variable
 LAVALINK_SERVER_PASSWORD=${LAVALINK_SERVER_PASSWORD:-youshallnotpass}
-
-# Escape special characters in the password for sed
-# Replace / with \/ and & with \&
-ESCAPED_PASSWORD=$(echo "$LAVALINK_SERVER_PASSWORD" | sed 's/[\/&]/\\&/g')
+echo "Password configured: $(echo $LAVALINK_SERVER_PASSWORD | head -c 3)***"
 
 # Replace environment variables in nginx.conf
+# Only PORT needs to be replaced - Authorization is passed through from client
 sed -e "s/\${PORT}/$PORT/g" \
-    -e "s/\${LAVALINK_SERVER_PASSWORD}/$ESCAPED_PASSWORD/g" \
     /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
 
-echo "Nginx configuration updated with port $PORT"
+echo "Nginx configuration updated"
 
 # Create log directories
 mkdir -p /var/log/nginx
@@ -27,6 +26,7 @@ mkdir -p /opt/Lavalink/logs
 
 # Function to handle shutdown
 shutdown() {
+    echo ""
     echo "Shutting down gracefully..."
     kill -TERM "$LAVALINK_PID" 2>/dev/null || true
     kill -TERM "$NGINX_PID" 2>/dev/null || true
@@ -40,21 +40,22 @@ shutdown() {
 trap shutdown SIGTERM SIGINT
 
 # Start Lavalink in the background
-echo "Starting Lavalink on port 8080..."
+echo ""
+echo "Starting Lavalink server..."
 java -Xmx400m -Xms100m \
     -XX:+UseG1GC \
     -XX:MaxGCPauseMillis=200 \
     -XX:+UnlockExperimentalVMOptions \
     -XX:+UseContainerSupport \
     -Djdk.tls.client.protocols=TLSv1.2 \
-    -DLAVALINK_SERVER_PASSWORD="${LAVALINK_SERVER_PASSWORD:-youshallnotpass}" \
     -jar /opt/Lavalink/Lavalink.jar &
 LAVALINK_PID=$!
-echo "Lavalink started with PID $LAVALINK_PID"
+echo "Lavalink PID: $LAVALINK_PID"
 
 # Wait for Lavalink to be ready
-echo "Waiting for Lavalink to be ready..."
-MAX_WAIT=120  # Maximum wait time in seconds
+echo ""
+echo "Waiting for Lavalink to initialize..."
+MAX_WAIT=120
 WAIT_COUNT=0
 READY=false
 
@@ -64,7 +65,9 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
         READY=true
         break
     fi
-    echo "Waiting for Lavalink... ($WAIT_COUNT/$MAX_WAIT seconds)"
+    if [ $((WAIT_COUNT % 10)) -eq 0 ]; then
+        echo "  Still waiting... ($WAIT_COUNT/$MAX_WAIT seconds)"
+    fi
     sleep 2
     WAIT_COUNT=$((WAIT_COUNT + 2))
 done
@@ -76,15 +79,24 @@ if [ "$READY" = false ]; then
 fi
 
 # Start Nginx in the background
-echo "Starting Nginx on port $PORT..."
+echo ""
+echo "Starting Nginx reverse proxy on port $PORT..."
 nginx -g 'daemon off;' &
 NGINX_PID=$!
-echo "Nginx started with PID $NGINX_PID"
+echo "Nginx PID: $NGINX_PID"
 
-echo "All services started successfully!"
-echo "  - Dashboard: http://localhost:$PORT/"
-echo "  - Lavalink API: http://localhost:$PORT/version"
-echo "  - Note: Lavalink may take 30-60 seconds to fully initialize"
+echo ""
+echo "========================================"
+echo "  Lavalink Public Server - Running"
+echo "========================================"
+echo ""
+echo "  WebSocket: wss://your-domain/v4/websocket"
+echo "  Dashboard: https://your-domain/"
+echo "  Version:   https://your-domain/version"
+echo ""
+echo "  Password:  Set in LAVALINK_SERVER_PASSWORD env var"
+echo ""
+echo "========================================"
 
 # Wait for either process to exit
 wait -n $LAVALINK_PID $NGINX_PID
