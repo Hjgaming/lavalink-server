@@ -59,25 +59,25 @@ echo "Lavalink PID: $LAVALINK_PID"
 # Wait for Lavalink to be ready
 echo ""
 echo "Waiting for Lavalink to initialize..."
-MAX_WAIT=120
-WAIT_COUNT=0
+timeout=0
+max_timeout=300
 READY=false
 
-while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
+while [ $timeout -lt $max_timeout ]; do
     if curl -s http://127.0.0.1:8080/version > /dev/null 2>&1; then
         echo "Lavalink is ready!"
         READY=true
         break
     fi
-    if [ $((WAIT_COUNT % 10)) -eq 0 ]; then
-        echo "  Still waiting... ($WAIT_COUNT/$MAX_WAIT seconds)"
-    fi
     sleep 2
-    WAIT_COUNT=$((WAIT_COUNT + 2))
+    timeout=$((timeout + 2))
+    if [ $((timeout % 10)) -eq 0 ]; then
+        echo "  Still waiting... ($timeout/$max_timeout seconds)"
+    fi
 done
 
 if [ "$READY" = false ]; then
-    echo "ERROR: Lavalink failed to start within $MAX_WAIT seconds"
+    echo "ERROR: Lavalink failed to start within $max_timeout seconds"
     kill -TERM "$LAVALINK_PID" 2>/dev/null || true
     exit 1
 fi
