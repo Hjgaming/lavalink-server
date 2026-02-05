@@ -45,8 +45,8 @@ trap shutdown SIGTERM SIGINT
 
 # Start Lavalink in the background
 echo ""
-echo "Starting Lavalink server..."
-java -Xmx400m -Xms100m \
+echo "Starting Lavalink server (512MB Heap)..."
+java -Xmx512m -Xms256m \
     -XX:+UseG1GC \
     -XX:MaxGCPauseMillis=200 \
     -XX:+UnlockExperimentalVMOptions \

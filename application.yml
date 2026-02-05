@@ -4,16 +4,12 @@ server:
 
 lavalink:
   # Plugins disabled for faster startup
-  # plugins:
-  #   # LavaSrc - Adds support for Spotify, Apple Music, Deezer, and more
-  #   - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.1.1"
-  #     repository: "https://maven.lavalink.dev/releases"
-  #   # LavaSearch - Enhanced search capabilities
-  #   - dependency: "com.github.topi314.lavasearch:lavasearch-plugin:1.0.0"
-  #     repository: "https://maven.lavalink.dev/releases"
-  #   # SponsorBlock - Skip sponsored segments in YouTube videos
-  #   - dependency: "com.github.topi314.sponsorblock:sponsorblock-plugin:3.0.1"
-  #     repository: "https://maven.lavalink.dev/releases"
+  plugins:
+    # YouTube Source Plugin - Mandatory for v4
+    - dependency: "dev.lavalink.youtube:youtube-plugin:1.11.4"
+    # LavaSrc - Adds support for Spotify, Apple Music, Deezer, and more
+    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.1.1"
+      repository: "https://maven.lavalink.dev/releases"
   
   server:
     password: ${LAVALINK_SERVER_PASSWORD:youshallnotpass}
