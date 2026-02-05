@@ -7,8 +7,17 @@ echo "Starting Lavalink Dashboard Server..."
 PORT=${PORT:-10000}
 echo "Using port: $PORT"
 
-# Replace ${PORT} in nginx.conf with actual port value
-sed "s/\${PORT}/$PORT/g" /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
+# Get the Lavalink password from environment variable
+LAVALINK_SERVER_PASSWORD=${LAVALINK_SERVER_PASSWORD:-youshallnotpass}
+
+# Escape special characters in the password for sed
+# Replace / with \/ and & with \&
+ESCAPED_PASSWORD=$(echo "$LAVALINK_SERVER_PASSWORD" | sed 's/[\/&]/\\&/g')
+
+# Replace environment variables in nginx.conf
+sed -e "s/\${PORT}/$PORT/g" \
+    -e "s/\${LAVALINK_SERVER_PASSWORD}/$ESCAPED_PASSWORD/g" \
+    /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
 
 echo "Nginx configuration updated with port $PORT"
 
