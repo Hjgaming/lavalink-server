@@ -3,9 +3,7 @@
 .github
 .gitignore
 
-# Documentation
-*.md
-README.md
+# Documentation (but not required files)
 LICENSE
 
 # Logs
@@ -29,3 +27,8 @@ node_modules/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp

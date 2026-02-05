@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lavalink Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🎵%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>🎵 Lavalink Server</h1>
+                <div class="header-info">
+                    <span class="status-badge" id="status-badge">
+                        <span class="status-dot"></span>
+                        <span id="status-text">Connecting...</span>
+                    </span>
+                    <span class="version" id="version">v-.-.-</span>
+                </div>
+            </div>
+            <div class="last-update">
+                Last updated: <span id="last-update">Never</span>
+            </div>
+        </header>
+
+        <!-- Main Grid -->
+        <div class="metrics-grid">
+            <!-- Server Information Card -->
+            <div class="card">
+                <h2 class="card-title">📊 Server Information</h2>
+                <div class="card-content">
+                    <div class="metric-row">
+                        <span class="metric-label">Version:</span>
+                        <span class="metric-value" id="server-version">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Uptime:</span>
+                        <span class="metric-value" id="server-uptime">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Build Time:</span>
+                        <span class="metric-value" id="build-time">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Git Branch:</span>
+                        <span class="metric-value" id="git-branch">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Git Commit:</span>
+                        <span class="metric-value" id="git-commit">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Memory Metrics Card -->
+            <div class="card">
+                <h2 class="card-title">💾 Memory Usage</h2>
+                <div class="card-content">
+                    <div class="metric-row">
+                        <span class="metric-label">Used:</span>
+                        <span class="metric-value" id="memory-used">-</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="memory-progress"></div>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Allocated:</span>
+                        <span class="metric-value" id="memory-allocated">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Free:</span>
+                        <span class="metric-value" id="memory-free">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Reservable:</span>
+                        <span class="metric-value" id="memory-reservable">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CPU Metrics Card -->
+            <div class="card">
+                <h2 class="card-title">⚡ CPU Usage</h2>
+                <div class="card-content">
+                    <div class="metric-row">
+                        <span class="metric-label">Process CPU:</span>
+                        <span class="metric-value" id="cpu-process">-</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="cpu-process-progress"></div>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">System CPU:</span>
+                        <span class="metric-value" id="cpu-system">-</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="cpu-system-progress"></div>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">CPU Cores:</span>
+                        <span class="metric-value" id="cpu-cores">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Player Statistics Card -->
+            <div class="card">
+                <h2 class="card-title">🎮 Player Statistics</h2>
+                <div class="card-content">
+                    <div class="metric-row">
+                        <span class="metric-label">Active Players:</span>
+                        <span class="metric-value highlight" id="players-active">0</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Playing Now:</span>
+                        <span class="metric-value highlight" id="players-playing">0</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Total Guilds:</span>
+                        <span class="metric-value" id="players-guilds">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Frame Statistics Card -->
+            <div class="card">
+                <h2 class="card-title">🎬 Frame Statistics</h2>
+                <div class="card-content">
+                    <div class="metric-row">
+                        <span class="metric-label">Sent/Min:</span>
+                        <span class="metric-value" id="frames-sent">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Nulled:</span>
+                        <span class="metric-value" id="frames-nulled">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Deficit:</span>
+                        <span class="metric-value" id="frames-deficit">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Loss Rate:</span>
+                        <span class="metric-value" id="frames-loss">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Details Card -->
+            <div class="card">
+                <h2 class="card-title">🖥️ System Details</h2>
+                <div class="card-content">
+                    <div class="metric-row">
+                        <span class="metric-label">JVM Version:</span>
+                        <span class="metric-value" id="jvm-version">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">OS:</span>
+                        <span class="metric-value" id="os-name">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Threads:</span>
+                        <span class="metric-value" id="threads-running">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Daemon Threads:</span>
+                        <span class="metric-value" id="threads-daemon">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Peak Threads:</span>
+                        <span class="metric-value" id="threads-peak">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Message -->
+        <div class="error-message" id="error-message" style="display: none;">
+            <span class="error-icon">⚠️</span>
+            <span id="error-text"></span>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Lavalink Dashboard &copy; 2024 | Auto-refreshes every 5 seconds</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
