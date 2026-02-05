@@ -143,23 +143,35 @@ async function fetchJSON(endpoint) {
     try {
         const response = await fetch(endpoint);
         
-        // Check if we got HTML instead of JSON (nginx serving index.html)
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('text/html')) {
-            throw new Error('Received HTML instead of JSON. Nginx may be serving static files instead of proxying to Lavalink. Check endpoint configuration.');
+        // Get raw text first for debugging
+        const text = await response.text();
+        
+        // Log for debugging (can be removed later)
+        if (!text || text.trim() === '') {
+            throw new Error('Empty response from ' + endpoint);
+        }
+        
+        // Check for HTML response
+        if (text.trim().startsWith('<')) {
+            throw new Error('Received HTML instead of JSON from ' + endpoint);
+        }
+        
+        // Check for plain text response
+        if (!text.trim().startsWith('{') && !text.trim().startsWith('[')) {
+            throw new Error('Received non-JSON response from ' + endpoint + ': ' + text.substring(0, 100));
         }
         
         if (!response.ok) {
-            throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+            throw new Error('HTTP ' + response.status + ': ' + response.statusText + ' - ' + text.substring(0, 200));
         }
         
-        const data = await response.json();
+        // Parse JSON
+        const data = JSON.parse(text);
         return data;
     } catch (error) {
-        // Provide more context for common errors
         if (error instanceof SyntaxError) {
             console.error('JSON parse error for ' + endpoint + ':', error);
-            throw new Error('Invalid JSON response from ' + endpoint + '. Response had valid Content-Type but failed to parse.');
+            throw new Error('Invalid JSON response from ' + endpoint + '. Check server logs.');
         }
         console.error('Error fetching ' + endpoint + ':', error);
         throw error;
@@ -301,13 +313,25 @@ async function updateSystemDetails() {
 
 async function updateDashboard() {
     try {
-        // Fetch all data
+        // Fetch critical data
         await Promise.all([
             updateStats(),
             updateInfo(),
-            updateVersion(),
-            updateSystemDetails()
         ]);
+        
+        // Try to update version, but don't fail if it doesn't work
+        try {
+            await updateVersion();
+        } catch (error) {
+            console.warn('Version endpoint failed, continuing anyway:', error);
+        }
+        
+        // Try to update system details, but don't fail if it doesn't work
+        try {
+            await updateSystemDetails();
+        } catch (error) {
+            console.warn('System details failed, continuing anyway:', error);
+        }
         
         // Update status
         isOnline = true;
