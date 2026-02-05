@@ -13,9 +13,13 @@ echo "Port: $PORT"
 LAVALINK_SERVER_PASSWORD=${LAVALINK_SERVER_PASSWORD:-youshallnotpass}
 echo "Password configured: $(echo $LAVALINK_SERVER_PASSWORD | head -c 3)***"
 
+# Escape special characters in the password for sed
+# Replace / with \/ and & with \&
+ESCAPED_PASSWORD=$(echo "$LAVALINK_SERVER_PASSWORD" | sed 's/[\/&]/\\&/g')
+
 # Replace environment variables in nginx.conf
-# Only PORT needs to be replaced - Authorization is passed through from client
 sed -e "s/\${PORT}/$PORT/g" \
+    -e "s/\${LAVALINK_SERVER_PASSWORD}/$ESCAPED_PASSWORD/g" \
     /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
 
 echo "Nginx configuration updated"
