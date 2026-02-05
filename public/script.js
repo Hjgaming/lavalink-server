@@ -330,14 +330,14 @@ async function updateDashboard() {
         if (isInitializing && retryCount < MAX_RETRIES) {
             retryCount++;
             updateStatusBadge(false, true);
-            showError(`Connecting to Lavalink... (Attempt ${retryCount}/${MAX_RETRIES}). Server may still be starting up.`, true);
+            showError('Connecting to Lavalink... (Attempt ' + retryCount + '/' + MAX_RETRIES + '). Server may still be starting up.', true);
         } else if (isInitializing && retryCount >= MAX_RETRIES) {
             isInitializing = false;
             updateStatusBadge(false);
-            showError(`Unable to connect to Lavalink after ${MAX_RETRIES} attempts. Error: ${error.message}`);
+            showError('Unable to connect to Lavalink after ' + MAX_RETRIES + ' attempts. Error: ' + error.message);
         } else {
             updateStatusBadge(false);
-            showError(`Connection lost: ${error.message}`);
+            showError('Connection lost: ' + error.message);
         }
     }
 }
@@ -359,7 +359,7 @@ async function init() {
     // Update "last update" time every second
     setInterval(updateLastUpdateTime, 1000);
     
-    console.log(`Dashboard initialized. Auto-refresh every ${REFRESH_INTERVAL / 1000}s`);
+    console.log('Dashboard initialized. Auto-refresh every ' + (REFRESH_INTERVAL / 1000) + 's');
 }
 
 // Retry logic for initial connection
@@ -375,7 +375,7 @@ async function retryInitialConnection() {
         
         // Wait before next retry (unless this was the last attempt)
         if (i < MAX_RETRIES - 1) {
-            console.log(`Retry ${i + 1}/${MAX_RETRIES} failed, waiting ${INITIAL_RETRY_DELAY}ms before next attempt...`);
+            console.log('Retry ' + (i + 1) + '/' + MAX_RETRIES + ' failed, waiting ' + INITIAL_RETRY_DELAY + 'ms before next attempt...');
             await new Promise(resolve => setTimeout(resolve, INITIAL_RETRY_DELAY));
         }
     }
