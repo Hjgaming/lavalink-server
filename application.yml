@@ -95,8 +95,8 @@ metrics:
     endpoint: /metrics
 
 sentry:
-  dsn: ${SENTRY_DSN:""}
-  environment: ${ENVIRONMENT:production}
+  dsn: "${SENTRY_DSN:}"
+  environment: "${ENVIRONMENT:production}"
 
 logging:
   file:

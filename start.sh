@@ -42,18 +42,8 @@ java -Xmx512m -Xms128m \
 LAVALINK_PID=$!
 echo "Lavalink started with PID $LAVALINK_PID"
 
-# Wait for Lavalink to be ready (max 60 seconds)
-echo "Waiting for Lavalink to be ready..."
-for i in $(seq 1 60); do
-    if curl -s -f http://127.0.0.1:8080/version > /dev/null 2>&1; then
-        echo "Lavalink is ready!"
-        break
-    fi
-    if [ $i -eq 60 ]; then
-        echo "WARNING: Lavalink did not start within 60 seconds"
-    fi
-    sleep 1
-done
+# Give Lavalink a moment to start binding to the port
+sleep 5
 
 # Start Nginx in the background
 echo "Starting Nginx on port $PORT..."
@@ -64,6 +54,7 @@ echo "Nginx started with PID $NGINX_PID"
 echo "All services started successfully!"
 echo "  - Dashboard: http://localhost:$PORT/"
 echo "  - Lavalink API: http://localhost:$PORT/version"
+echo "  - Note: Lavalink may take 30-60 seconds to fully initialize"
 
 # Wait for either process to exit
 wait -n $LAVALINK_PID $NGINX_PID
