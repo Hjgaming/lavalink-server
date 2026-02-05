@@ -76,20 +76,20 @@ plugins:
       flowerytts: false
     
     spotify:
-      clientId: ${SPOTIFY_CLIENT_ID:your_spotify_client_id}
-      clientSecret: ${SPOTIFY_CLIENT_SECRET:your_spotify_client_secret}
+      clientId: ${SPOTIFY_CLIENT_ID:""}
+      clientSecret: ${SPOTIFY_CLIENT_SECRET:""}
       countryCode: ${SPOTIFY_COUNTRY_CODE:US}
       playlistLoadLimit: 10
       albumLoadLimit: 10
     
     applemusic:
       countryCode: ${APPLE_MUSIC_COUNTRY_CODE:US}
-      mediaAPIToken: ${APPLE_MUSIC_API_TOKEN:your_apple_music_api_token}
+      mediaAPIToken: ${APPLE_MUSIC_API_TOKEN:""}
       playlistLoadLimit: 10
       albumLoadLimit: 10
     
     deezer:
-      masterDecryptionKey: ${DEEZER_MASTER_KEY:your_deezer_master_decryption_key}
+      masterDecryptionKey: ${DEEZER_MASTER_KEY:""}
 #   
 #   # LavaSearch configuration
 #   lavasearch:
