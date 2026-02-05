@@ -148,7 +148,7 @@ async function fetchJSON(endpoint) {
         // Check if we got HTML instead of JSON (nginx serving index.html)
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('text/html')) {
-            throw new Error(`Received HTML instead of JSON. Nginx may be misconfigured or Lavalink is not running.`);
+            throw new Error('Received HTML instead of JSON. Nginx may be misconfigured or Lavalink is not running.');
         }
         
         if (!response.ok) {
@@ -161,7 +161,7 @@ async function fetchJSON(endpoint) {
         // Provide more context for common errors
         if (error instanceof SyntaxError) {
             console.error(`JSON parse error for ${endpoint}:`, error);
-            throw new Error(`Invalid JSON response from ${endpoint}. Server may be returning HTML.`);
+            throw new Error('Invalid JSON response from ' + endpoint + '. Server may be returning HTML.');
         }
         console.error(`Error fetching ${endpoint}:`, error);
         throw error;
@@ -365,16 +365,18 @@ async function init() {
 // Retry logic for initial connection
 async function retryInitialConnection() {
     for (let i = 0; i < MAX_RETRIES; i++) {
-        try {
-            await updateDashboard();
-            // Success - exit retry loop
+        await updateDashboard();
+        
+        // Check if connection was successful
+        if (isOnline) {
+            console.log('Successfully connected to Lavalink');
             return;
-        } catch (error) {
-            if (i < MAX_RETRIES - 1) {
-                // Wait before retrying
-                console.log(`Retry ${i + 1}/${MAX_RETRIES} failed, waiting ${INITIAL_RETRY_DELAY}ms before next attempt...`);
-                await new Promise(resolve => setTimeout(resolve, INITIAL_RETRY_DELAY));
-            }
+        }
+        
+        // Wait before next retry (unless this was the last attempt)
+        if (i < MAX_RETRIES - 1) {
+            console.log(`Retry ${i + 1}/${MAX_RETRIES} failed, waiting ${INITIAL_RETRY_DELAY}ms before next attempt...`);
+            await new Promise(resolve => setTimeout(resolve, INITIAL_RETRY_DELAY));
         }
     }
     
