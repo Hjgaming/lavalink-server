@@ -8,18 +8,15 @@ LABEL version="4.0"
 # Set working directory
 WORKDIR /opt/Lavalink
 
-# Install wget for health checks
-RUN apk add --no-cache wget
-
 # Copy application configuration
 COPY application.yml ./
 
 # Expose Lavalink port
 EXPOSE 2333
 
-# Health check configuration
+# Health check configuration (using curl which is available in the base image)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-2333}/version || exit 1
+  CMD curl -f http://localhost:${PORT:-2333}/version || exit 1
 
 # Run Lavalink with optimized JVM flags for production
 CMD ["java", \
