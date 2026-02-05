@@ -12,9 +12,9 @@ services:
       - key: PORT
         value: 10000
       - key: LAVALINK_SERVER_PASSWORD
-        generateValue: true  # Auto-generate a secure password
+        value: arbotixop007  # Fixed password to match bot's .env
       - key: JAVA_TOOL_OPTIONS
-        value: "-Xmx400m -Xms100m"
+        value: "-Xmx512m -Xms256m"
     
     # Health check configuration
     healthCheckPath: /version

@@ -49,34 +49,47 @@ lavalink:
     gc-warnings: true
 
 # Plugin configurations disabled (plugins are commented out above)
-# plugins:
-#   # LavaSrc configuration
-#   lavasrc:
-#     providers:
-#       - "ytsearch:\"%ISRC%\""
-#       - "ytsearch:%QUERY%"
-#     sources:
-#       spotify: true
-#       applemusic: true
-#       deezer: true
-#       yandexmusic: false
-#       flowerytts: false
-#     
-#     spotify:
-#       clientId: ${SPOTIFY_CLIENT_ID:""}
-#       clientSecret: ${SPOTIFY_CLIENT_SECRET:""}
-#       countryCode: ${SPOTIFY_COUNTRY_CODE:US}
-#       playlistLoadLimit: 10
-#       albumLoadLimit: 10
-#     
-#     applemusic:
-#       countryCode: ${APPLE_MUSIC_COUNTRY_CODE:US}
-#       mediaAPIToken: ${APPLE_MUSIC_API_TOKEN:""}
-#       playlistLoadLimit: 10
-#       albumLoadLimit: 10
-#     
-#     deezer:
-#       masterDecryptionKey: ${DEEZER_MASTER_KEY:""}
+# Plugin configurations
+plugins:
+  # YouTube Source Plugin configuration
+  youtube:
+    enabled: true
+    allowSearch: true
+    allowDirectVideoIds: true
+    allowDirectPlaylistIds: true
+    clients:
+      - MUSIC
+      - ANDROID_TEST
+      - WEB
+      - TVHTML5EMBEDDED
+  
+  # LavaSrc configuration
+  lavasrc:
+    providers:
+      - "ytsearch:\"%ISRC%\""
+      - "ytsearch:%QUERY%"
+    sources:
+      spotify: true
+      applemusic: true
+      deezer: true
+      yandexmusic: false
+      flowerytts: false
+    
+    spotify:
+      clientId: ${SPOTIFY_CLIENT_ID:your_spotify_client_id}
+      clientSecret: ${SPOTIFY_CLIENT_SECRET:your_spotify_client_secret}
+      countryCode: ${SPOTIFY_COUNTRY_CODE:US}
+      playlistLoadLimit: 10
+      albumLoadLimit: 10
+    
+    applemusic:
+      countryCode: ${APPLE_MUSIC_COUNTRY_CODE:US}
+      mediaAPIToken: ${APPLE_MUSIC_API_TOKEN:your_apple_music_api_token}
+      playlistLoadLimit: 10
+      albumLoadLimit: 10
+    
+    deezer:
+      masterDecryptionKey: ${DEEZER_MASTER_KEY:your_deezer_master_decryption_key}
 #   
 #   # LavaSearch configuration
 #   lavasearch:
