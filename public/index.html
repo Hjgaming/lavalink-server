@@ -6,6 +6,8 @@
     <title>Lavalink Dashboard</title>
     <link rel="stylesheet" href="style.css">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🎵%3C/text%3E%3C/svg%3E">
+    <!-- Chart.js for real-time graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -13,18 +15,87 @@
         <header class="header">
             <div class="header-content">
                 <h1>🎵 Lavalink Server</h1>
-                <div class="header-info">
-                    <span class="status-badge" id="status-badge">
-                        <span class="status-dot"></span>
-                        <span id="status-text">Connecting...</span>
-                    </span>
-                    <span class="version" id="version">v-.-.-</span>
+                <div class="header-controls">
+                    <div class="refresh-control">
+                        <label for="refresh-interval">Refresh:</label>
+                        <select id="refresh-interval">
+                            <option value="3000">3s</option>
+                            <option value="5000" selected>5s</option>
+                            <option value="10000">10s</option>
+                            <option value="30000">30s</option>
+                        </select>
+                        <button id="toggle-refresh" class="btn btn-sm" title="Toggle auto-refresh">
+                            <span id="refresh-icon">⏸️</span>
+                        </button>
+                    </div>
+                    <button id="theme-toggle" class="btn btn-icon" title="Toggle theme">🌙</button>
                 </div>
             </div>
-            <div class="last-update">
-                Last updated: <span id="last-update">Never</span>
+            <div class="header-info">
+                <span class="status-badge" id="status-badge">
+                    <span class="status-dot"></span>
+                    <span id="status-text">Connecting...</span>
+                </span>
+                <span class="version" id="version">v-.-.-</span>
+                <span class="last-update">Updated: <span id="last-update">Never</span></span>
             </div>
         </header>
+
+        <!-- Quick Stats Bar -->
+        <div class="quick-stats">
+            <div class="quick-stat">
+                <span class="quick-stat-value" id="quick-players">0</span>
+                <span class="quick-stat-label">Players</span>
+            </div>
+            <div class="quick-stat">
+                <span class="quick-stat-value" id="quick-playing">0</span>
+                <span class="quick-stat-label">Playing</span>
+            </div>
+            <div class="quick-stat">
+                <span class="quick-stat-value" id="quick-cpu">0%</span>
+                <span class="quick-stat-label">CPU</span>
+            </div>
+            <div class="quick-stat">
+                <span class="quick-stat-value" id="quick-memory">0%</span>
+                <span class="quick-stat-label">Memory</span>
+            </div>
+            <div class="quick-stat">
+                <span class="quick-stat-value" id="quick-uptime">0s</span>
+                <span class="quick-stat-label">Uptime</span>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="charts-section">
+            <div class="card chart-card">
+                <h2 class="card-title">📈 CPU Usage History</h2>
+                <div class="chart-container">
+                    <canvas id="cpu-chart"></canvas>
+                </div>
+            </div>
+            <div class="card chart-card">
+                <h2 class="card-title">💾 Memory Usage History</h2>
+                <div class="chart-container">
+                    <canvas id="memory-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Audio Sources & Plugins -->
+        <div class="sources-plugins-section">
+            <div class="card">
+                <h2 class="card-title">🎵 Audio Sources</h2>
+                <div class="sources-grid" id="sources-grid">
+                    <div class="source-badge loading">Loading...</div>
+                </div>
+            </div>
+            <div class="card">
+                <h2 class="card-title">🔌 Loaded Plugins</h2>
+                <div class="plugins-list" id="plugins-list">
+                    <div class="plugin-item loading">Loading...</div>
+                </div>
+            </div>
+        </div>
 
         <!-- Main Grid -->
         <div class="metrics-grid">
@@ -161,18 +232,25 @@
                         <span class="metric-value" id="os-name">-</span>
                     </div>
                     <div class="metric-row">
-                        <span class="metric-label">Threads:</span>
-                        <span class="metric-value" id="threads-running">-</span>
+                        <span class="metric-label">Arch:</span>
+                        <span class="metric-value" id="os-arch">-</span>
                     </div>
                     <div class="metric-row">
-                        <span class="metric-label">Daemon Threads:</span>
-                        <span class="metric-value" id="threads-daemon">-</span>
-                    </div>
-                    <div class="metric-row">
-                        <span class="metric-label">Peak Threads:</span>
-                        <span class="metric-value" id="threads-peak">-</span>
+                        <span class="metric-label">Lavaplayer:</span>
+                        <span class="metric-value" id="lavaplayer-version">-</span>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Connection Log -->
+        <div class="card log-card">
+            <div class="card-header-with-actions">
+                <h2 class="card-title">📋 Connection Log</h2>
+                <button id="clear-log" class="btn btn-sm">Clear</button>
+            </div>
+            <div class="log-container" id="log-container">
+                <div class="log-entry info">Dashboard initialized...</div>
             </div>
         </div>
 
@@ -184,7 +262,7 @@
 
         <!-- Footer -->
         <footer class="footer">
-            <p>Lavalink Dashboard &copy; 2024 | Auto-refreshes every 5 seconds</p>
+            <p>Lavalink Dashboard &copy; 2024 | <span id="footer-refresh-status">Auto-refreshes every 5 seconds</span></p>
         </footer>
     </div>
 

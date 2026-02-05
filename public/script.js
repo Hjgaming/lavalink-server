@@ -1,11 +1,14 @@
+// =====================================================
+// Lavalink Dashboard - Advanced Version
+// =====================================================
+
 // Configuration
-const REFRESH_INTERVAL = 5000; // 5 seconds
-const INITIAL_RETRY_DELAY = 2000; // 2 seconds
-const MAX_RETRIES = 5; // Maximum retry attempts on initial connection
-const WARNING_GRADIENT = 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)';
-const ERROR_GRADIENT = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
-const MAX_ERROR_PREVIEW_LENGTH = 100; // Maximum length of error message preview
-const MAX_ERROR_DETAIL_LENGTH = 200; // Maximum length of detailed error message
+const DEFAULT_REFRESH_INTERVAL = 5000;
+const INITIAL_RETRY_DELAY = 2000;
+const MAX_RETRIES = 5;
+const CHART_MAX_POINTS = 30;
+const MAX_LOG_ENTRIES = 50;
+
 const API_ENDPOINTS = {
     stats: '/v4/stats',
     info: '/v4/info',
@@ -17,8 +20,27 @@ let isOnline = false;
 let lastUpdate = null;
 let retryCount = 0;
 let isInitializing = true;
+let refreshInterval = DEFAULT_REFRESH_INTERVAL;
+let isAutoRefresh = true;
+let refreshTimer = null;
 
+// Chart instances
+let cpuChart = null;
+let memoryChart = null;
+
+// Chart data history
+const chartData = {
+    labels: [],
+    cpuProcess: [],
+    cpuSystem: [],
+    memoryUsed: [],
+    memoryAllocated: []
+};
+
+// =====================================================
 // Utility Functions
+// =====================================================
+
 function formatBytes(bytes) {
     if (!bytes || bytes === 0) return '0 MB';
     const mb = bytes / (1024 * 1024);
@@ -40,12 +62,25 @@ function formatUptime(milliseconds) {
     if (days > 0) parts.push(`${days}d`);
     if (hours % 24 > 0) parts.push(`${hours % 24}h`);
     if (minutes % 60 > 0) parts.push(`${minutes % 60}m`);
-    if (seconds % 60 > 0) parts.push(`${seconds % 60}s`);
+    if (parts.length === 0 || seconds % 60 > 0) parts.push(`${seconds % 60}s`);
     
     return parts.join(' ') || '0s';
 }
 
-function formatPercentage(value, decimals = 2) {
+function formatUptimeShort(milliseconds) {
+    if (!milliseconds) return '0s';
+    const seconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    if (days > 0) return `${days}d ${hours % 24}h`;
+    if (hours > 0) return `${hours}h ${minutes % 60}m`;
+    if (minutes > 0) return `${minutes}m`;
+    return `${seconds}s`;
+}
+
+function formatPercentage(value, decimals = 1) {
     if (value === null || value === undefined) return 'N/A';
     return `${(value * 100).toFixed(decimals)}%`;
 }
@@ -59,6 +94,10 @@ function formatTimestamp(timestamp) {
     if (!timestamp) return 'N/A';
     const date = new Date(timestamp);
     return date.toLocaleString();
+}
+
+function formatTime(date) {
+    return date.toLocaleTimeString('en-US', { hour12: false });
 }
 
 function getProgressBarClass(percentage) {
@@ -83,6 +122,50 @@ function updateElement(id, value) {
     }
 }
 
+// =====================================================
+// Logging Functions
+// =====================================================
+
+function addLog(message, type = 'info') {
+    const logContainer = document.getElementById('log-container');
+    if (!logContainer) return;
+    
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${type}`;
+    
+    const time = document.createElement('span');
+    time.className = 'log-time';
+    time.textContent = formatTime(new Date());
+    
+    const msg = document.createElement('span');
+    msg.className = 'log-message';
+    msg.textContent = message;
+    
+    entry.appendChild(time);
+    entry.appendChild(msg);
+    logContainer.appendChild(entry);
+    
+    // Keep only last N entries
+    while (logContainer.children.length > MAX_LOG_ENTRIES) {
+        logContainer.removeChild(logContainer.firstChild);
+    }
+    
+    // Auto-scroll to bottom
+    logContainer.scrollTop = logContainer.scrollHeight;
+}
+
+function clearLog() {
+    const logContainer = document.getElementById('log-container');
+    if (logContainer) {
+        logContainer.innerHTML = '';
+        addLog('Log cleared', 'info');
+    }
+}
+
+// =====================================================
+// Error & Status Functions
+// =====================================================
+
 function showError(message, isWarning = false) {
     const errorElement = document.getElementById('error-message');
     const errorText = document.getElementById('error-text');
@@ -90,9 +173,6 @@ function showError(message, isWarning = false) {
     if (errorElement && errorText) {
         errorText.textContent = message;
         errorElement.style.display = 'flex';
-        
-        // Visual distinction for warnings vs errors
-        errorElement.style.background = isWarning ? WARNING_GRADIENT : ERROR_GRADIENT;
     }
 }
 
@@ -140,179 +220,361 @@ function updateLastUpdateTime() {
     }
 }
 
-// API Functions
-async function fetchJSON(endpoint) {
-    try {
-        const response = await fetch(endpoint);
-        
-        // Get raw text first for debugging
-        const text = await response.text();
-        const trimmedText = text.trim();
-        
-        // Check for empty response
-        if (!trimmedText) {
-            throw new Error('Empty response from ' + endpoint);
+// =====================================================
+// Chart Functions
+// =====================================================
+
+function initCharts() {
+    const chartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: {
+            duration: 500
+        },
+        plugins: {
+            legend: {
+                display: true,
+                position: 'top',
+                labels: {
+                    color: getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim(),
+                    padding: 15,
+                    usePointStyle: true
+                }
+            }
+        },
+        scales: {
+            x: {
+                display: true,
+                grid: {
+                    color: 'rgba(48, 54, 61, 0.3)'
+                },
+                ticks: {
+                    color: getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim(),
+                    maxTicksLimit: 6
+                }
+            },
+            y: {
+                display: true,
+                min: 0,
+                max: 100,
+                grid: {
+                    color: 'rgba(48, 54, 61, 0.3)'
+                },
+                ticks: {
+                    color: getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim(),
+                    callback: (value) => `${value}%`
+                }
+            }
+        },
+        interaction: {
+            intersect: false,
+            mode: 'index'
         }
-        
-        // Check for HTML response
-        if (trimmedText.startsWith('<')) {
-            throw new Error('Received HTML instead of JSON from ' + endpoint + ': ' + trimmedText.substring(0, MAX_ERROR_PREVIEW_LENGTH));
-        }
-        
-        // Check for plain text response (JSON must start with { or [)
-        if (!trimmedText.startsWith('{') && !trimmedText.startsWith('[')) {
-            throw new Error('Received non-JSON response from ' + endpoint + ': ' + trimmedText.substring(0, MAX_ERROR_PREVIEW_LENGTH));
-        }
-        
-        if (!response.ok) {
-            throw new Error('HTTP ' + response.status + ': ' + response.statusText + ' - ' + trimmedText.substring(0, MAX_ERROR_DETAIL_LENGTH));
-        }
-        
-        // Parse JSON
-        const data = JSON.parse(trimmedText);
-        return data;
-    } catch (error) {
-        if (error instanceof SyntaxError) {
-            console.error('JSON parse error for ' + endpoint + ':', error);
-            throw new Error('Invalid JSON response from ' + endpoint + '. Check server logs.');
-        }
-        console.error('Error fetching ' + endpoint + ':', error);
-        throw error;
+    };
+
+    // CPU Chart
+    const cpuCtx = document.getElementById('cpu-chart');
+    if (cpuCtx) {
+        cpuChart = new Chart(cpuCtx, {
+            type: 'line',
+            data: {
+                labels: chartData.labels,
+                datasets: [
+                    {
+                        label: 'Process',
+                        data: chartData.cpuProcess,
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.2)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        borderWidth: 2
+                    },
+                    {
+                        label: 'System',
+                        data: chartData.cpuSystem,
+                        borderColor: '#764ba2',
+                        backgroundColor: 'rgba(118, 75, 162, 0.2)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        borderWidth: 2
+                    }
+                ]
+            },
+            options: chartOptions
+        });
     }
+
+    // Memory Chart
+    const memoryCtx = document.getElementById('memory-chart');
+    if (memoryCtx) {
+        const memoryOptions = { ...chartOptions };
+        memoryOptions.scales = {
+            ...memoryOptions.scales,
+            y: {
+                ...memoryOptions.scales.y,
+                max: undefined,
+                ticks: {
+                    color: getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim(),
+                    callback: (value) => `${value} MB`
+                }
+            }
+        };
+        
+        memoryChart = new Chart(memoryCtx, {
+            type: 'line',
+            data: {
+                labels: chartData.labels,
+                datasets: [
+                    {
+                        label: 'Used',
+                        data: chartData.memoryUsed,
+                        borderColor: '#43e97b',
+                        backgroundColor: 'rgba(67, 233, 123, 0.2)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        borderWidth: 2
+                    },
+                    {
+                        label: 'Allocated',
+                        data: chartData.memoryAllocated,
+                        borderColor: '#38f9d7',
+                        backgroundColor: 'rgba(56, 249, 215, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        borderWidth: 2
+                    }
+                ]
+            },
+            options: memoryOptions
+        });
+    }
+}
+
+function updateChartData(stats) {
+    const now = formatTime(new Date());
+    
+    // Add new data point
+    chartData.labels.push(now);
+    chartData.cpuProcess.push((stats.cpu?.lavalinkLoad || 0) * 100);
+    chartData.cpuSystem.push((stats.cpu?.systemLoad || 0) * 100);
+    chartData.memoryUsed.push(Math.round((stats.memory?.used || 0) / (1024 * 1024)));
+    chartData.memoryAllocated.push(Math.round((stats.memory?.allocated || 0) / (1024 * 1024)));
+    
+    // Keep only last N points
+    if (chartData.labels.length > CHART_MAX_POINTS) {
+        chartData.labels.shift();
+        chartData.cpuProcess.shift();
+        chartData.cpuSystem.shift();
+        chartData.memoryUsed.shift();
+        chartData.memoryAllocated.shift();
+    }
+    
+    // Update charts
+    if (cpuChart) {
+        cpuChart.update('none');
+    }
+    if (memoryChart) {
+        memoryChart.update('none');
+    }
+}
+
+// =====================================================
+// API Functions
+// =====================================================
+
+async function fetchJSON(endpoint) {
+    const response = await fetch(endpoint);
+    
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const text = await response.text();
+    const trimmedText = text.trim();
+    
+    if (!trimmedText) {
+        throw new Error('Empty response from ' + endpoint);
+    }
+    
+    if (!trimmedText.startsWith('{') && !trimmedText.startsWith('[')) {
+        throw new Error('Non-JSON response from ' + endpoint);
+    }
+    
+    return JSON.parse(trimmedText);
+}
+
+async function fetchText(endpoint) {
+    const response = await fetch(endpoint);
+    
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    return (await response.text()).trim();
 }
 
 async function updateStats() {
-    try {
-        const data = await fetchJSON(API_ENDPOINTS.stats);
-        
-        // Memory metrics
-        const memoryUsed = data.memory?.used || 0;
-        const memoryAllocated = data.memory?.allocated || 0;
-        const memoryFree = data.memory?.free || 0;
-        const memoryReservable = data.memory?.reservable || 0;
-        
-        updateElement('memory-used', `${formatBytes(memoryUsed)} (${formatPercentage(memoryUsed / memoryAllocated)})`);
-        updateElement('memory-allocated', formatBytes(memoryAllocated));
-        updateElement('memory-free', formatBytes(memoryFree));
-        updateElement('memory-reservable', formatBytes(memoryReservable));
-        
-        const memoryPercentage = memoryAllocated > 0 ? (memoryUsed / memoryAllocated) * 100 : 0;
-        updateProgressBar('memory-progress', memoryPercentage);
-        
-        // CPU metrics
-        const cpuProcess = data.cpu?.lavalinkLoad || 0;
-        const cpuSystem = data.cpu?.systemLoad || 0;
-        const cpuCores = data.cpu?.cores || 0;
-        
-        updateElement('cpu-process', formatPercentage(cpuProcess));
-        updateElement('cpu-system', formatPercentage(cpuSystem));
-        updateElement('cpu-cores', cpuCores);
-        
-        updateProgressBar('cpu-process-progress', cpuProcess * 100);
-        updateProgressBar('cpu-system-progress', cpuSystem * 100);
-        
-        // Player statistics
-        const players = data.players || 0;
-        const playingPlayers = data.playingPlayers || 0;
-        
-        updateElement('players-active', formatNumber(players));
-        updateElement('players-playing', formatNumber(playingPlayers));
-        updateElement('players-guilds', formatNumber(players)); // Assuming one player per guild
-        
-        // Frame statistics
-        const frameStats = data.frameStats || {};
-        const sent = frameStats.sent || 0;
-        const nulled = frameStats.nulled || 0;
-        const deficit = frameStats.deficit || 0;
-        
-        updateElement('frames-sent', formatNumber(sent));
-        updateElement('frames-nulled', formatNumber(nulled));
-        updateElement('frames-deficit', formatNumber(deficit));
-        
-        const totalFrames = sent + nulled + deficit;
-        const lossPercentage = totalFrames > 0 ? ((nulled + deficit) / totalFrames) * 100 : 0;
-        updateElement('frames-loss', `${lossPercentage.toFixed(2)}%`);
-        
-        // Uptime
-        const uptime = data.uptime || 0;
-        updateElement('server-uptime', formatUptime(uptime));
-        
-    } catch (error) {
-        console.error('Error updating stats:', error);
-        throw error;
-    }
+    const data = await fetchJSON(API_ENDPOINTS.stats);
+    
+    // Memory metrics
+    const memoryUsed = data.memory?.used || 0;
+    const memoryAllocated = data.memory?.allocated || 0;
+    const memoryFree = data.memory?.free || 0;
+    const memoryReservable = data.memory?.reservable || 0;
+    
+    updateElement('memory-used', `${formatBytes(memoryUsed)} (${formatPercentage(memoryUsed / memoryAllocated)})`);
+    updateElement('memory-allocated', formatBytes(memoryAllocated));
+    updateElement('memory-free', formatBytes(memoryFree));
+    updateElement('memory-reservable', formatBytes(memoryReservable));
+    
+    const memoryPercentage = memoryAllocated > 0 ? (memoryUsed / memoryAllocated) * 100 : 0;
+    updateProgressBar('memory-progress', memoryPercentage);
+    
+    // CPU metrics
+    const cpuProcess = data.cpu?.lavalinkLoad || 0;
+    const cpuSystem = data.cpu?.systemLoad || 0;
+    const cpuCores = data.cpu?.cores || 0;
+    
+    updateElement('cpu-process', formatPercentage(cpuProcess));
+    updateElement('cpu-system', formatPercentage(cpuSystem));
+    updateElement('cpu-cores', cpuCores);
+    
+    updateProgressBar('cpu-process-progress', cpuProcess * 100);
+    updateProgressBar('cpu-system-progress', cpuSystem * 100);
+    
+    // Quick stats
+    updateElement('quick-cpu', formatPercentage(cpuProcess, 0));
+    updateElement('quick-memory', formatPercentage(memoryUsed / memoryAllocated, 0));
+    
+    // Player statistics
+    const players = data.players || 0;
+    const playingPlayers = data.playingPlayers || 0;
+    
+    updateElement('players-active', formatNumber(players));
+    updateElement('players-playing', formatNumber(playingPlayers));
+    updateElement('players-guilds', formatNumber(players));
+    
+    updateElement('quick-players', players);
+    updateElement('quick-playing', playingPlayers);
+    
+    // Frame statistics
+    const frameStats = data.frameStats || {};
+    const sent = frameStats.sent || 0;
+    const nulled = frameStats.nulled || 0;
+    const deficit = frameStats.deficit || 0;
+    
+    updateElement('frames-sent', formatNumber(sent));
+    updateElement('frames-nulled', formatNumber(nulled));
+    updateElement('frames-deficit', formatNumber(deficit));
+    
+    const totalFrames = sent + nulled + deficit;
+    const lossPercentage = totalFrames > 0 ? ((nulled + deficit) / totalFrames) * 100 : 0;
+    updateElement('frames-loss', `${lossPercentage.toFixed(2)}%`);
+    
+    // Uptime
+    const uptime = data.uptime || 0;
+    updateElement('server-uptime', formatUptime(uptime));
+    updateElement('quick-uptime', formatUptimeShort(uptime));
+    
+    // Update charts
+    updateChartData(data);
+    
+    return data;
 }
 
 async function updateInfo() {
-    try {
-        const data = await fetchJSON(API_ENDPOINTS.info);
-        
-        // Version info
-        const version = data.version || {};
-        updateElement('server-version', version.semver || 'Unknown');
-        
-        // Build info
-        updateElement('build-time', formatTimestamp(version.build));
-        
-        // Git info
-        const git = data.git || {};
-        updateElement('git-branch', git.branch || 'Unknown');
-        updateElement('git-commit', git.commit ? git.commit.substring(0, 7) : 'Unknown');
-        
-        // JVM info
-        const jvm = data.jvm || 'Unknown';
-        updateElement('jvm-version', jvm);
-        
-        // System info (if available)
-        if (data.systemLoad !== undefined) {
-            updateElement('cpu-system', formatPercentage(data.systemLoad));
-        }
-        
-    } catch (error) {
-        console.error('Error updating info:', error);
-        throw error;
-    }
+    const data = await fetchJSON(API_ENDPOINTS.info);
+    
+    // Version info
+    const version = data.version || {};
+    updateElement('server-version', version.semver || 'Unknown');
+    
+    // Build info
+    updateElement('build-time', formatTimestamp(version.build));
+    
+    // Git info
+    const git = data.git || {};
+    updateElement('git-branch', git.branch || 'Unknown');
+    updateElement('git-commit', git.commit ? git.commit.substring(0, 7) : 'Unknown');
+    
+    // JVM info
+    updateElement('jvm-version', data.jvm || 'Unknown');
+    
+    // Lavaplayer info
+    updateElement('lavaplayer-version', data.lavaplayer || 'Unknown');
+    
+    // OS info
+    const os = data.os || {};
+    updateElement('os-name', `${os.name || 'Unknown'} ${os.version || ''}`.trim());
+    updateElement('os-arch', os.arch || 'Unknown');
+    
+    // Update sources
+    updateSources(data.sourceManagers || []);
+    
+    // Update plugins
+    updatePlugins(data.plugins || []);
+    
+    return data;
 }
 
 async function updateVersion() {
-    try {
-        const data = await fetchJSON(API_ENDPOINTS.version);
-        
-        // Update version in header
-        updateElement('version', `v${data.semver || data.version || 'Unknown'}`);
-        
-        // Update build time
-        if (data.build) {
-            updateElement('build-time', formatTimestamp(data.build));
-        }
-        
-    } catch (error) {
-        console.error('Error updating version:', error);
-        throw error;
-    }
+    const version = await fetchText(API_ENDPOINTS.version);
+    const cleanVersion = version.replace(/^"|"$/g, '');
+    updateElement('version', cleanVersion.startsWith('v') ? cleanVersion : `v${cleanVersion || 'Unknown'}`);
 }
 
-async function updateSystemDetails() {
-    try {
-        const data = await fetchJSON(API_ENDPOINTS.info);
-        
-        // OS info
-        const os = data.os || {};
-        updateElement('os-name', `${os.name || 'Unknown'} ${os.version || ''}`.trim());
-        
-        // Thread info (if available in stats)
-        const statsData = await fetchJSON(API_ENDPOINTS.stats);
-        if (statsData.threads) {
-            updateElement('threads-running', formatNumber(statsData.threads.running || 0));
-            updateElement('threads-daemon', formatNumber(statsData.threads.daemon || 0));
-            updateElement('threads-peak', formatNumber(statsData.threads.peak || 0));
-        }
-        
-    } catch (error) {
-        console.error('Error updating system details:', error);
-        // Don't throw - this is optional data
+function updateSources(sources) {
+    const container = document.getElementById('sources-grid');
+    if (!container) return;
+    
+    const sourceNames = {
+        'youtube': '🎬 YouTube',
+        'soundcloud': '☁️ SoundCloud',
+        'bandcamp': '🎸 Bandcamp',
+        'twitch': '📺 Twitch',
+        'vimeo': '🎥 Vimeo',
+        'http': '🌐 HTTP',
+        'local': '📁 Local',
+        'spotify': '🎧 Spotify',
+        'applemusic': '🍎 Apple Music',
+        'deezer': '🎵 Deezer'
+    };
+    
+    if (sources.length === 0) {
+        container.innerHTML = '<div class="source-badge disabled">No sources available</div>';
+        return;
     }
+    
+    container.innerHTML = sources.map(source => {
+        const name = sourceNames[source.toLowerCase()] || source;
+        return `<div class="source-badge enabled">✓ ${name}</div>`;
+    }).join('');
 }
+
+function updatePlugins(plugins) {
+    const container = document.getElementById('plugins-list');
+    if (!container) return;
+    
+    if (plugins.length === 0) {
+        container.innerHTML = '<div class="no-plugins">No plugins loaded</div>';
+        return;
+    }
+    
+    container.innerHTML = plugins.map(plugin => `
+        <div class="plugin-item">
+            <span class="plugin-name">${plugin.name || 'Unknown Plugin'}</span>
+            <span class="plugin-version">${plugin.version || '?'}</span>
+        </div>
+    `).join('');
+}
+
+// =====================================================
+// Dashboard Update
+// =====================================================
 
 async function updateDashboard() {
     try {
@@ -322,21 +584,18 @@ async function updateDashboard() {
             updateInfo(),
         ]);
         
-        // Try to update version, but don't fail if it doesn't work
+        // Try to update version
         try {
             await updateVersion();
         } catch (error) {
-            console.warn('Version endpoint failed, continuing anyway:', error);
-        }
-        
-        // Try to update system details, but don't fail if it doesn't work
-        try {
-            await updateSystemDetails();
-        } catch (error) {
-            console.warn('System details failed, continuing anyway:', error);
+            console.warn('Version endpoint failed:', error);
         }
         
         // Update status
+        if (!isOnline) {
+            addLog('Connected to Lavalink server', 'success');
+        }
+        
         isOnline = true;
         isInitializing = false;
         retryCount = 0;
@@ -349,63 +608,212 @@ async function updateDashboard() {
         
     } catch (error) {
         console.error('Dashboard update failed:', error);
+        
+        if (isOnline) {
+            addLog(`Connection lost: ${error.message}`, 'error');
+        }
+        
         isOnline = false;
         
-        // Different handling for initial connection vs ongoing updates
         if (isInitializing && retryCount < MAX_RETRIES) {
             retryCount++;
             updateStatusBadge(false, true);
-            showError('Connecting to Lavalink... (Attempt ' + retryCount + '/' + MAX_RETRIES + '). Server may still be starting up.', true);
+            showError(`Connecting to Lavalink... (Attempt ${retryCount}/${MAX_RETRIES})`);
         } else if (isInitializing && retryCount >= MAX_RETRIES) {
             isInitializing = false;
             updateStatusBadge(false);
-            showError('Unable to connect to Lavalink after ' + MAX_RETRIES + ' attempts. Error: ' + error.message);
+            showError(`Unable to connect after ${MAX_RETRIES} attempts: ${error.message}`);
+            addLog(`Failed to connect after ${MAX_RETRIES} attempts`, 'error');
         } else {
             updateStatusBadge(false);
-            showError('Connection lost: ' + error.message);
+            showError(`Connection lost: ${error.message}`);
         }
     }
 }
 
-// Initialize
+// =====================================================
+// Theme Functions
+// =====================================================
+
+function initTheme() {
+    const savedTheme = localStorage.getItem('lavalink-theme') || 'dark';
+    setTheme(savedTheme);
+}
+
+function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('lavalink-theme', theme);
+    
+    const themeToggle = document.getElementById('theme-toggle');
+    if (themeToggle) {
+        themeToggle.textContent = theme === 'dark' ? '🌙' : '☀️';
+    }
+    
+    // Update chart colors if charts exist
+    updateChartColors();
+}
+
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    addLog(`Theme changed to ${newTheme} mode`, 'info');
+}
+
+function updateChartColors() {
+    const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim();
+    
+    [cpuChart, memoryChart].forEach(chart => {
+        if (chart) {
+            chart.options.plugins.legend.labels.color = textColor;
+            chart.options.scales.x.ticks.color = textColor;
+            chart.options.scales.y.ticks.color = textColor;
+            chart.update('none');
+        }
+    });
+}
+
+// =====================================================
+// Refresh Control Functions
+// =====================================================
+
+function initRefreshControl() {
+    const intervalSelect = document.getElementById('refresh-interval');
+    const toggleBtn = document.getElementById('toggle-refresh');
+    
+    if (intervalSelect) {
+        intervalSelect.addEventListener('change', (e) => {
+            refreshInterval = parseInt(e.target.value, 10);
+            restartRefreshTimer();
+            updateRefreshStatus();
+            addLog(`Refresh interval changed to ${refreshInterval / 1000}s`, 'info');
+        });
+    }
+    
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+            isAutoRefresh = !isAutoRefresh;
+            updateRefreshIcon();
+            updateRefreshStatus();
+            
+            if (isAutoRefresh) {
+                restartRefreshTimer();
+                addLog('Auto-refresh enabled', 'info');
+            } else {
+                stopRefreshTimer();
+                addLog('Auto-refresh paused', 'warning');
+            }
+        });
+    }
+}
+
+function updateRefreshIcon() {
+    const icon = document.getElementById('refresh-icon');
+    if (icon) {
+        icon.textContent = isAutoRefresh ? '⏸️' : '▶️';
+    }
+}
+
+function updateRefreshStatus() {
+    const status = document.getElementById('footer-refresh-status');
+    if (status) {
+        if (isAutoRefresh) {
+            status.textContent = `Auto-refreshes every ${refreshInterval / 1000} seconds`;
+        } else {
+            status.textContent = 'Auto-refresh paused';
+        }
+    }
+}
+
+function startRefreshTimer() {
+    if (refreshTimer) {
+        clearInterval(refreshTimer);
+    }
+    refreshTimer = setInterval(updateDashboard, refreshInterval);
+}
+
+function stopRefreshTimer() {
+    if (refreshTimer) {
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+    }
+}
+
+function restartRefreshTimer() {
+    stopRefreshTimer();
+    if (isAutoRefresh) {
+        startRefreshTimer();
+    }
+}
+
+// =====================================================
+// Event Listeners
+// =====================================================
+
+function initEventListeners() {
+    // Theme toggle
+    const themeToggle = document.getElementById('theme-toggle');
+    if (themeToggle) {
+        themeToggle.addEventListener('click', toggleTheme);
+    }
+    
+    // Clear log
+    const clearLogBtn = document.getElementById('clear-log');
+    if (clearLogBtn) {
+        clearLogBtn.addEventListener('click', clearLog);
+    }
+}
+
+// =====================================================
+// Initialization
+// =====================================================
+
 async function init() {
     console.log('Initializing Lavalink Dashboard...');
     
+    // Initialize theme
+    initTheme();
+    
+    // Initialize event listeners
+    initEventListeners();
+    
+    // Initialize refresh control
+    initRefreshControl();
+    
+    // Initialize charts
+    initCharts();
+    
     // Set status to connecting
     updateStatusBadge(false, true);
-    showError('Connecting to Lavalink...', true);
+    addLog('Connecting to Lavalink server...', 'info');
     
     // Initial update with retry logic
     await retryInitialConnection();
     
     // Set up auto-refresh
-    setInterval(updateDashboard, REFRESH_INTERVAL);
+    startRefreshTimer();
     
     // Update "last update" time every second
     setInterval(updateLastUpdateTime, 1000);
     
-    console.log('Dashboard initialized. Auto-refresh every ' + (REFRESH_INTERVAL / 1000) + 's');
+    console.log('Dashboard initialized.');
 }
 
-// Retry logic for initial connection
 async function retryInitialConnection() {
     for (let i = 0; i < MAX_RETRIES; i++) {
         await updateDashboard();
         
-        // Check if connection was successful
         if (isOnline) {
             console.log('Successfully connected to Lavalink');
             return;
         }
         
-        // Wait before next retry (unless this was the last attempt)
         if (i < MAX_RETRIES - 1) {
-            console.log('Retry ' + (i + 1) + '/' + MAX_RETRIES + ' failed, waiting ' + INITIAL_RETRY_DELAY + 'ms before next attempt...');
+            console.log(`Retry ${i + 1}/${MAX_RETRIES} failed, waiting...`);
             await new Promise(resolve => setTimeout(resolve, INITIAL_RETRY_DELAY));
         }
     }
     
-    // All retries exhausted
     console.error('Failed to establish initial connection after all retries');
 }
 
