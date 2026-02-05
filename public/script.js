@@ -4,6 +4,8 @@ const INITIAL_RETRY_DELAY = 2000; // 2 seconds
 const MAX_RETRIES = 5; // Maximum retry attempts on initial connection
 const WARNING_GRADIENT = 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)';
 const ERROR_GRADIENT = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+const MAX_ERROR_PREVIEW_LENGTH = 100; // Maximum length of error message preview
+const MAX_ERROR_DETAIL_LENGTH = 200; // Maximum length of detailed error message
 const API_ENDPOINTS = {
     stats: '/v4/stats',
     info: '/v4/info',
@@ -146,8 +148,8 @@ async function fetchJSON(endpoint) {
         // Get raw text first for debugging
         const text = await response.text();
         
-        // Log for debugging (can be removed later)
-        if (!text || text.trim() === '') {
+        // Check for empty response
+        if (!text.trim()) {
             throw new Error('Empty response from ' + endpoint);
         }
         
@@ -158,11 +160,11 @@ async function fetchJSON(endpoint) {
         
         // Check for plain text response
         if (!text.trim().startsWith('{') && !text.trim().startsWith('[')) {
-            throw new Error('Received non-JSON response from ' + endpoint + ': ' + text.substring(0, 100));
+            throw new Error('Received non-JSON response from ' + endpoint + ': ' + text.substring(0, MAX_ERROR_PREVIEW_LENGTH));
         }
         
         if (!response.ok) {
-            throw new Error('HTTP ' + response.status + ': ' + response.statusText + ' - ' + text.substring(0, 200));
+            throw new Error('HTTP ' + response.status + ': ' + response.statusText + ' - ' + text.substring(0, MAX_ERROR_DETAIL_LENGTH));
         }
         
         // Parse JSON
